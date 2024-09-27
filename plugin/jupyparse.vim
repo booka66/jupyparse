@@ -1,1 +1,1 @@
-lua require('jupyparse').setup()
+require('jupyparse')
