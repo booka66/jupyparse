@@ -44,12 +44,27 @@ function M.open_notebook(file_path)
 	render_notebook(cells)
 end
 
+-- New function to open the notebook for the current buffer
+function M.open_current_notebook()
+	local current_file = vim.fn.expand("%:p")
+	if current_file ~= "" then
+		M.open_notebook(current_file)
+	else
+		print("No file in current buffer")
+	end
+end
+
 -- Set up the plugin
 function M.setup()
 	-- Command to open a notebook file
 	vim.api.nvim_create_user_command("OpenNotebook", function(opts)
 		M.open_notebook(opts.args)
 	end, { nargs = 1, complete = "file" })
+
+	-- New command to open the notebook for the current buffer
+	vim.api.nvim_create_user_command("OpenCurrentNotebook", function()
+		M.open_current_notebook()
+	end, {})
 end
 
 return M
