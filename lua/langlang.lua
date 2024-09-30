@@ -3,9 +3,6 @@ local M = {}
 -- Table to store error information
 M.error_info = {}
 
--- Timer for delayed popup
-M.popup_timer = nil
-
 -- Function to run LanguageTool and parse its output
 function M.run_languagetool()
 	local file_path = vim.fn.expand("%:p")
@@ -110,22 +107,9 @@ function M.show_popup()
 					focusable = false,
 				})
 			end
-			return
+			break
 		end
 	end
-
-	-- If we're not over an error, close any existing popups
-	vim.api.nvim_command("close")
-end
-
--- Function to handle cursor movement
-function M.on_cursor_move()
-	if M.popup_timer then
-		vim.fn.timer_stop(M.popup_timer)
-	end
-	M.popup_timer = vim.fn.timer_start(100, function()
-		M.show_popup()
-	end)
 end
 
 -- Command to run LanguageTool
@@ -135,8 +119,7 @@ vim.api.nvim_create_user_command("LanguageTool", M.run_languagetool, {})
 vim.cmd([[
   augroup LanguageTool
     autocmd!
-    autocmd CursorMoved * lua require('langlang').on_cursor_move()
-    autocmd CursorMovedI * lua require('langlang').on_cursor_move()
+    autocmd CursorHold * lua require('langlang').show_popup()
   augroup END
 ]])
 
