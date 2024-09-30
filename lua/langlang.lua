@@ -65,27 +65,45 @@ function M.highlight_error(ns_id, error)
 	local row = error.row
 	local col_start = error.col
 	local line = vim.api.nvim_buf_get_lines(0, row, row + 1, false)[1]
-
 	if not line then
 		return
 	end
 
-	local col_end = math.min(col_start + #error.context, #line)
+	-- Find the exact position of the error in the context
+	local context_start, context_end = error.context:find("^%.%.%.")
+	local error_text = error.context:sub(context_end + 1, -4) -- Remove leading and trailing '...'
+	local error_start, error_end = line:find(error_text, col_start + 1, true)
 
-	-- Highlight the error
-	vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, col_start, col_end)
+	if error_start and error_end then
+		-- Highlight only the specific error text
+		vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, error_start - 1, error_end)
 
-	-- Store error information
-	local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
-		end_col = col_end,
-		strict = false,
-	})
+		-- Store error information
+		local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, row, error_start - 1, {
+			end_col = error_end,
+			strict = false,
+		})
 
-	-- Store error information in our table
-	M.error_info[extmark_id] = {
-		message = error.message,
-		suggestion = error.suggestion,
-	}
+		-- Store error information in our table
+		M.error_info[extmark_id] = {
+			message = error.message,
+			suggestion = error.suggestion,
+		}
+	else
+		-- Fallback to the original method if we can't find the exact error text
+		local col_end = math.min(col_start + #error.context, #line)
+		vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, col_start, col_end)
+
+		local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
+			end_col = col_end,
+			strict = false,
+		})
+
+		M.error_info[extmark_id] = {
+			message = error.message,
+			suggestion = error.suggestion,
+		}
+	end
 end
 
 -- Function to show popup on hover
