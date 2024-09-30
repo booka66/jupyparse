@@ -20,7 +20,7 @@ function M.run_languagetool()
 		end,
 		on_stderr = function(_, data)
 			if data then
-				print("LanguageTool error: " .. table.concat(data, "\n"))
+				-- print("LanguageTool error: " .. table.concat(data, "\n"))
 			end
 		end,
 		stdout_buffered = true,
