@@ -67,7 +67,6 @@ function M.highlight_error(ns_id, error)
 	vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
 		end_col = col_end,
 		hl_group = "Error",
-		ephemeral = true,
 		data = { message = error.message, suggestion = error.suggestion },
 	})
 end
@@ -81,9 +80,9 @@ function M.show_popup()
 	local extmarks = vim.api.nvim_buf_get_extmarks(0, ns_id, { row, 0 }, { row, -1 }, { details = true })
 
 	for _, extmark in ipairs(extmarks) do
-		local mark_row, mark_col, mark_end_col = unpack(extmark[2])
-		if row == mark_row and col >= mark_col and col < mark_end_col then
-			local data = extmark[4].data
+		local mark_row, mark_col, mark_details = extmark[2], extmark[3], extmark[4]
+		if row == mark_row and col >= mark_col and col < mark_details.end_col then
+			local data = mark_details.data
 			local popup_text = string.format("Error: %s\nSuggestion: %s", data.message, data.suggestion)
 			vim.lsp.util.open_floating_preview({ popup_text }, "plaintext", {
 				border = "rounded",
