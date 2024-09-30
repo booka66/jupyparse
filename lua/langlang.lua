@@ -69,9 +69,10 @@ function M.highlight_error(ns_id, error)
 		return
 	end
 
-	-- Find the exact position of the error in the context
-	local context_start, context_end = error.context:find("^%.%.%.")
-	local error_text = error.context:sub(context_end + 1, -4) -- Remove leading and trailing '...'
+	-- Extract the error text from the context, handling cases where it might not start/end with '...'
+	local error_text = error.context
+	error_text = error_text:gsub("^%.%.%.", ""):gsub("%.%.%.$", "")
+
 	local error_start, error_end = line:find(error_text, col_start + 1, true)
 
 	if error_start and error_end then
