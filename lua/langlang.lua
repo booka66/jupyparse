@@ -8,8 +8,6 @@ function M.run_languagetool()
 	-- Run the command and capture its output
 	local output = vim.fn.system(command)
 
-	vim.notify(output)
-
 	-- Parse the output and highlight errors
 	M.parse_and_highlight(output)
 end
@@ -25,6 +23,8 @@ function M.parse_and_highlight(output)
 			local row = tonumber(line_num) - 1
 			local col_start = tonumber(col) - 1
 			local col_end = col_start + 1 -- Highlight only one character for simplicity
+
+			vim.notify(message)
 
 			-- Add virtual text for the error
 			vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
