@@ -8,6 +8,8 @@ function M.run_languagetool()
 	-- Run the command and capture its output
 	local output = vim.fn.system(command)
 
+	vim.notify(output)
+
 	-- Parse the output and highlight errors
 	M.parse_and_highlight(output)
 end
