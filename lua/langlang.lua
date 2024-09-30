@@ -1,98 +1,42 @@
--- languagetool.lua
-
 local M = {}
 
--- Configuration
-M.config = {
-	languagetool_cmd = "/opt/homebrew/bin/languagetool",
-	filetypes = { "tex" },
-	signs = {
-		enable = true,
-		priority = 10,
-	},
-}
+-- Function to run LanguageTool and parse its output
+function M.run_languagetool()
+	local file_path = vim.fn.expand("%:p")
+	local command = string.format('languagetool "%s"', file_path)
 
--- Initialize the plugin
-function M.setup(opts)
-	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+	-- Run the command and capture its output
+	local output = vim.fn.system(command)
 
-	-- Create highlight group for grammar issues
-	vim.cmd([[highlight default link LanguageToolGrammarError SpellBad]])
-
-	-- Create sign for grammar issues
-	if M.config.signs.enable then
-		vim.fn.sign_define("LanguageToolGrammarError", {
-			text = "≈",
-			texthl = "LanguageToolGrammarError",
-			linehl = "LanguageToolGrammarError",
-		})
-	end
-
-	-- Set up autocommands
-	vim.api.nvim_create_autocmd("BufWritePost", {
-		pattern = "*.tex",
-		callback = M.check_grammar,
-	})
-
-	-- Add command to manually trigger grammar check
-	vim.api.nvim_create_user_command("LanguageToolCheck", M.check_grammar, {})
+	-- Parse the output and highlight errors
+	M.parse_and_highlight(output)
 end
 
--- Function to check grammar
-function M.check_grammar()
-	local bufnr = vim.api.nvim_get_current_buf()
-	local filetype = vim.bo[bufnr].filetype
+-- Function to parse LanguageTool output and highlight errors
+function M.parse_and_highlight(output)
+	local ns_id = vim.api.nvim_create_namespace("languagetool")
+	vim.api.nvim_buf_clear_namespace(0, ns_id, 0, -1)
 
-	if not vim.tbl_contains(M.config.filetypes, filetype) then
-		return
-	end
+	for line in output:gmatch("[^\r\n]+") do
+		local line_num, col, message = line:match("Line (%d+), column (%d+).*Message: (.+)")
+		if line_num and col and message then
+			local row = tonumber(line_num) - 1
+			local col_start = tonumber(col) - 1
+			local col_end = col_start + 1 -- Highlight only one character for simplicity
 
-	local filename = vim.fn.expand("%:p")
-	local cmd = string.format("%s %s", M.config.languagetool_cmd, filename)
+			-- Add virtual text for the error
+			vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
+				virt_text = { { message, "Error" } },
+				virt_text_pos = "eol",
+			})
 
-	-- Clear existing signs and highlights
-	M.clear_highlights(bufnr)
-
-	-- Run LanguageTool
-	vim.fn.jobstart(cmd, {
-		stdout_buffered = true,
-		on_stdout = function(_, data)
-			M.parse_output(bufnr, data)
-		end,
-		on_exit = function()
-			vim.cmd("redraw")
-		end,
-	})
-end
-
--- Function to parse LanguageTool output
-function M.parse_output(bufnr, data)
-	for _, line in ipairs(data) do
-		local row, col, message = line:match("(%d+)%.(%d+): (.+)")
-		if row and col and message then
-			row = tonumber(row)
-			col = tonumber(col)
-
-			-- Add highlight
-			vim.api.nvim_buf_add_highlight(bufnr, -1, "LanguageToolGrammarError", row - 1, col - 1, -1)
-
-			-- Add sign
-			if M.config.signs.enable then
-				vim.fn.sign_place(0, "LanguageTool", "LanguageToolGrammarError", bufnr, {
-					lnum = row,
-					priority = M.config.signs.priority,
-				})
-			end
+			-- Highlight the error
+			vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, col_start, col_end)
 		end
 	end
 end
 
--- Function to clear highlights and signs
-function M.clear_highlights(bufnr)
-	vim.api.nvim_buf_clear_namespace(bufnr, -1, 0, -1)
-	if M.config.signs.enable then
-		vim.fn.sign_unplace("LanguageTool", { buffer = bufnr })
-	end
-end
+-- Command to run LanguageTool
+vim.api.nvim_create_user_command("LanguageTool", M.run_languagetool, {})
 
 return M
