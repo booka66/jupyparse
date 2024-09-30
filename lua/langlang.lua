@@ -64,7 +64,13 @@ end
 function M.highlight_error(ns_id, error)
 	local row = error.row
 	local col_start = error.col
-	local col_end = col_start + #error.context
+	local line = vim.api.nvim_buf_get_lines(0, row, row + 1, false)[1]
+
+	if not line then
+		return
+	end
+
+	local col_end = math.min(col_start + #error.context, #line)
 
 	-- Highlight the error
 	vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, col_start, col_end)
@@ -72,7 +78,7 @@ function M.highlight_error(ns_id, error)
 	-- Store error information
 	local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
 		end_col = col_end,
-		hl_group = "Error",
+		strict = false,
 	})
 
 	-- Store error information in our table
@@ -92,7 +98,7 @@ function M.show_popup()
 
 	for _, extmark in ipairs(extmarks) do
 		local mark_id, mark_row, mark_col, mark_details = extmark[1], extmark[2], extmark[3], extmark[4]
-		if row == mark_row and col >= mark_col and col < mark_details.end_col then
+		if row == mark_row and col >= mark_col and col < (mark_details.end_col or mark_col) then
 			local error_data = M.error_info[mark_id]
 			if error_data then
 				local popup_text = string.format("Error: %s\nSuggestion: %s", error_data.message, error_data.suggestion)
