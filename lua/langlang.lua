@@ -22,38 +22,26 @@ end
 function M.parse_and_highlight(output)
 	local ns_id = vim.api.nvim_create_namespace("languagetool")
 	vim.api.nvim_buf_clear_namespace(0, ns_id, 0, -1)
-
 	local current_error = {}
-	local in_error = false
-
 	for line in output:gmatch("[^\r\n]+") do
 		if line:match("^%d+%.%)") then
 			-- New error found, process the previous one if it exists
 			if current_error.row then
 				M.highlight_error(ns_id, current_error)
 			end
-
 			local line_num, col = line:match("Line (%d+), column (%d+)")
 			current_error = {
-				row = tonumber(line_num) - 1,
-				col = tonumber(col) - 1,
+				row = tonumber(line_num) - 1, -- Lua is 0-indexed
+				col = tonumber(col) - 1, -- Lua is 0-indexed
 				message = "",
 				suggestion = "",
-				context = "",
 			}
-			in_error = true
-		elseif in_error then
-			if line:match("^Message:") then
-				current_error.message = line:match("^Message: (.+)")
-			elseif line:match("^Suggestion:") then
-				current_error.suggestion = line:match("^Suggestion: (.+)")
-			elseif line:match("^%.%.%.") then
-				current_error.context = line:match("%.%.%.(.-%.%.%.)")
-				in_error = false
-			end
+		elseif line:match("^Message:") then
+			current_error.message = line:match("^Message: (.+)")
+		elseif line:match("^Suggestion:") then
+			current_error.suggestion = line:match("^Suggestion: (.+)")
 		end
 	end
-
 	-- Process the last error
 	if current_error.row then
 		M.highlight_error(ns_id, current_error)
@@ -69,42 +57,26 @@ function M.highlight_error(ns_id, error)
 		return
 	end
 
-	-- Extract the error text from the context, handling cases where it might not start/end with '...'
-	local error_text = error.context
-	error_text = error_text:gsub("^%.%.%.", ""):gsub("%.%.%.$", "")
-
-	local error_start, error_end = line:find(error_text, col_start + 1, true)
-
-	if error_start and error_end then
-		-- Highlight only the specific error text
-		vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, error_start - 1, error_end)
-
-		-- Store error information
-		local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, row, error_start - 1, {
-			end_col = error_end,
-			strict = false,
-		})
-
-		-- Store error information in our table
-		M.error_info[extmark_id] = {
-			message = error.message,
-			suggestion = error.suggestion,
-		}
-	else
-		-- Fallback to the original method if we can't find the exact error text
-		local col_end = math.min(col_start + #error.context, #line)
-		vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, col_start, col_end)
-
-		local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
-			end_col = col_end,
-			strict = false,
-		})
-
-		M.error_info[extmark_id] = {
-			message = error.message,
-			suggestion = error.suggestion,
-		}
+	-- Find the end of the word starting at col_start
+	local col_end = col_start
+	while col_end < #line and line:sub(col_end + 1, col_end + 1):match("%w") do
+		col_end = col_end + 1
 	end
+
+	-- Highlight only the specific word or phrase
+	vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, col_start, col_end + 1)
+
+	-- Store error information
+	local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
+		end_col = col_end + 1,
+		strict = false,
+	})
+
+	-- Store error information in our table
+	M.error_info[extmark_id] = {
+		message = error.message,
+		suggestion = error.suggestion,
+	}
 end
 
 -- Function to show popup on hover
