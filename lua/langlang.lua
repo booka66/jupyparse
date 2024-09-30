@@ -17,25 +17,59 @@ function M.parse_and_highlight(output)
 	local ns_id = vim.api.nvim_create_namespace("languagetool")
 	vim.api.nvim_buf_clear_namespace(0, ns_id, 0, -1)
 
+	local current_error = {}
 	for line in output:gmatch("[^\r\n]+") do
-		local line_num, col, message = line:match("Line (%d+), column (%d+).*Message: (.+)")
-		if line_num and col and message then
-			local row = tonumber(line_num) - 1
-			local col_start = tonumber(col) - 1
-			local col_end = col_start + 1 -- Highlight only one character for simplicity
+		local line_num, col, rule_id = line:match("(%d+)%.) Line (%d+), column (%d+), Rule ID: (.+)")
+		local message = line:match("Message: (.+)")
+		local suggestion = line:match("Suggestion: (.+)")
+		local context = line:match("%.%.%.(.-)%.%.%.")
 
-			vim.notify(message)
+		if line_num and col then
+			-- New error found, process the previous one if it exists
+			if current_error.row then
+				M.highlight_error(ns_id, current_error)
+			end
+			current_error = {
+				row = tonumber(line_num) - 1,
+				col = tonumber(col) - 1,
+				rule_id = rule_id,
+				message = "",
+				suggestion = "",
+				context = "",
+			}
+		end
 
-			-- Add virtual text for the error
-			vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
-				virt_text = { { message, "Error" } },
-				virt_text_pos = "eol",
-			})
-
-			-- Highlight the error
-			vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, col_start, col_end)
+		if message then
+			current_error.message = message
+		end
+		if suggestion then
+			current_error.suggestion = suggestion
+		end
+		if context then
+			current_error.context = context
 		end
 	end
+
+	-- Process the last error
+	if current_error.row then
+		M.highlight_error(ns_id, current_error)
+	end
+end
+
+-- Function to highlight a single error
+function M.highlight_error(ns_id, error)
+	local row = error.row
+	local col_start = error.col
+	local col_end = col_start + #error.context
+
+	-- Add virtual text for the error
+	vim.api.nvim_buf_set_extmark(0, ns_id, row, col_start, {
+		virt_text = { { error.message .. " (Suggestion: " .. error.suggestion .. ")", "Error" } },
+		virt_text_pos = "eol",
+	})
+
+	-- Highlight the error
+	vim.api.nvim_buf_add_highlight(0, ns_id, "Error", row, col_start, col_end)
 end
 
 -- Command to run LanguageTool
