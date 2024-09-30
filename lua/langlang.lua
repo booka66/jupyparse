@@ -1,4 +1,4 @@
--- langlang.lua
+-- languagetool.lua
 
 local M = {}
 
@@ -6,7 +6,6 @@ local M = {}
 M.config = {
 	languagetool_cmd = "/opt/homebrew/bin/languagetool",
 	filetypes = { "tex" },
-	auto_check = false,
 	signs = {
 		enable = true,
 		priority = 10,
@@ -18,9 +17,7 @@ function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 
 	-- Create highlight group for grammar issues
-	vim.cmd([[
-    highlight default link LanguageToolGrammarError SpellBad
-  ]])
+	vim.cmd([[highlight default link LanguageToolGrammarError SpellBad]])
 
 	-- Create sign for grammar issues
 	if M.config.signs.enable then
@@ -32,12 +29,10 @@ function M.setup(opts)
 	end
 
 	-- Set up autocommands
-	vim.cmd([[
-    augroup LanguageTool
-      autocmd!
-      autocmd BufWritePost *.tex lua require('languagetool').check_grammar()
-    augroup END
-  ]])
+	vim.api.nvim_create_autocmd("BufWritePost", {
+		pattern = "*.tex",
+		callback = M.check_grammar,
+	})
 
 	-- Add command to manually trigger grammar check
 	vim.api.nvim_create_user_command("LanguageToolCheck", M.check_grammar, {})
@@ -53,7 +48,7 @@ function M.check_grammar()
 	end
 
 	local filename = vim.fn.expand("%:p")
-	local cmd = string.format("%s -l en-US %s", M.config.languagetool_cmd, filename)
+	local cmd = string.format("%s %s", M.config.languagetool_cmd, filename)
 
 	-- Clear existing signs and highlights
 	M.clear_highlights(bufnr)
